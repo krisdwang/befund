@@ -94,7 +94,7 @@ We will use the Fig.1 to illustrate how VM-DPoSW works.
 
 我们利用图片1来描述VM—DPoSW如何工作。
 
-![how does vm-dposw work](images/Fig-1.png)
+![how does vm-dposw work](https://raw.githubusercontent.com/krisdwang/befund/master/images/Fig-1.png)
 
 a. Create Virtual Machines 创建虚拟机
 
@@ -151,10 +151,79 @@ In VM-DPoSW, however, we may choose to set the hash difficulty lower so that eve
 
 但是，在VM-DPoSW中，我们可以选择将散列难度设置得更低，以便即使具有最低计算能力的VM也可以快速完成散列计算，并且可以在给定时间窗口内生成新的块和进程事务。虽然这种设计显着提高了生态系统的效率，但它可能会增加安全漏洞，因为恶意用户可能会利用较低的散列难度。这需要我们添加额外的安全机制，即签名和随机排序，以保护BFDChain生态系统。  
 
-![The signature and ordering of VM-DPoS](images/Fig-2.png)
+![The signature and ordering of VM-DPoS](https://raw.githubusercontent.com/krisdwang/befund/master/images/Fig-2.png)
 
 The design goal of the signature and random ordering is to ensure a given delegate VM in the delegate cluster can only process transaction request in the assigned “round” as well as the assigned time window. As illustrated in Fig.2., assume in round N, VM2 starts to perform the mining and create a new block at T0, we add a private key into the optional filed of the block and got a signature $ S_{1}^{vm2}$ by performing
 $$ S_1^{vm2} = Hash(K_1^{vm2}) \tag 6$$
+Where $K_1^{vm2}$ is the private key value for the $1^{st}$ block created by VM2 in the round N. Similarly, when VM2 creates the $2^{nd}$  and $3^{rd}$ block, the signature $S_2^{vm3}$ and $S_3^{vm3}$ are calculated by  
+$$ S_2^{vm3} = Hash(K_2^{vm2} + S_1^{vm3}) \tag 7$$
+$$ S_3^{vm3} = Hash(K_3^{vm2} + S_2^{vm3}) \tag 8$$ 
+respectively. Once VM2 creates its $3^{rd}$ block, VM2 determines this is the last block it can process, it then broadcast the signature $S_3^{vm3}$ to all other VM delegates, before T2.
+
+
+签名和随机排序的设计目标是确保委托集群中的给定委托VM只能处理分配的“轮次”以及分配的时间窗口中的事务请求。如图2所示，假设在第N轮，VM2开始执行挖掘并在T0创建一个新块，我们将一个私钥添加到块的可选字段中，并通过执行
+$$ S_1^{vm2} = Hash(K_1^{vm2}) \tag 6$$
+得到一个签名$ S_{1}^{vm2}$, 其中$K_1^{vm2}$是VM2在第N轮中创建的第一个区块的私钥。类似地，当VM2创建第二个和第三个块时，签名$S_2^{vm3}$和$S_3^{vm3}$ 分别由
+$$ S_2^{vm3} = Hash(K_2^{vm2} + S_1^{vm3}) \tag 7$$
+$$ S_3^{vm3} = Hash(K_3^{vm2} + S_2^{vm3}) \tag 8$$ 
+计算。一旦VM2创建其第3个块，VM2确定它是它可以处理的最后一个块，然后它在T2之前将签名$S_3^{vm3}$广播给所有其他VM代表。
+
+Sequentially, VM4 and VM6 will be the second and third VMs to follow similar procedure to create their blocks and perform the signature broadcast at the end of their last block mining. In our case, $S_1^{vm6}$ between T2 and T3, is the last signature in round N, and is the proof needed by each VM delegate to participate mining in the next round N+1. Image a malicious delegate tries to cheat the system by performing mining before round N finish and try to work on round N+1. Its mining of new block(s) will be rejected because it will not have the final signature $S_1^{vm6}$ to sign the newly created block.
+
+顺序地，VM4和VM6将是第二个和第三个VM，它们遵循类似的过程来创建它们的块并在其最后一个块挖掘结束时执行签名广播。在我们的例子中，T2和T3之间的$S_1^{vm6}$是第N轮中的最后一个签名，并且是每个VM代表在下一轮$N+1$中参与挖掘所需的证明。图像恶意委托试图通过在第N轮完成之前执行挖掘来欺骗系统并尝试在第$N+1$轮上工作。它的新块的挖掘将被拒绝，因为它不会有最终的签名$S_1^{vm6}$来签署新创建的区块。
+
+In round N+1, we can generalize (6)-(8) as below:  
+在第$N+1$轮中，我们可以归纳（6）-（8）如下:
+$$ S(n+1) = Hash\left(K(n) + sum_{i=1}^k S^{vm_i}(n) \right) \tag 9$$
+
+Where K(n) is the key value at round N+1, and $\sum_{i=1}^kS^{vm6}(n)$ is the sum of the hash value of K number of VM delegate in the previous round (for example, we have K=3 in round N).  
+
+其中K(n) 是第 $N+1$轮的键值，$\sum_{i=1}^kS^{vm6}(n)$是前一轮中VM代表的K数的哈希值的总和（例如，我们在第N轮中有K=3). 
+
+In addition, we use the following mechanism to determine the order of VM delegate in round N+1:  
+另外，我们使用以下机制来确定第N + 1轮中VM委托的顺序:  
+$$O(n+1) = S(n) mod(M) \tag {10} $$
+
+Where S(n) is the signature of the last block in round N (i.e., $S_1^{vm6}$ in our example) and M is the number of VM delegates. The mod operation will determine the serving order of each VM delegate in round N+1. In our case, in N+1, the mod result for VM2, VM4, and VM6 are 1, 0, and 2. Thus VM6 is scheduled to start to create block first at time stamp T4, followed by VM2 (3 blocks starting at T5), and VM4 (2 blocks starting at T6).
+
+其中 $S(n)$是第N轮中最后一个块的签名(例如，在我们的例子中是$S_1^{vm6}$)，M是VM代表的数量。 mod操作将确定第 $N+1$轮中每个VM代表的服务顺序。在我们的例子中，在$N+1$中，VM2，VM4和VM6的mod结果是1,0和2.因此VM6被安排在时间戳T4开始创建块，然后是VM2（3个区块开始于T5）和VM4（从T6开始的2个区块).
+
+If there is conflict during the mod operation, we point the VM delegate to the next available slot. In case a particular VM delegate is not able to generate block in its given time windows, we will use the signature in the previous broadcast.  
+
+如果在mod操作期间存在冲突，我们将VM委托指向下一个可用的插槽。如果特定VM委托无法在其给定时间窗口中生成区块，我们将使用先前广播中的签名。
+
+## IV. THE CONTROLLABILITY ANALYSIS OF VM-DPOSW. 
+## IV. VM-DPOSW的可控性分析
+
+In any system design, the controllability is the most import aspect to inspect. The consensus algorithm design is not an exception.  
+在任何系统设计中，可控性是需要检查的最重要的方面, 一致性算法设计也不例外.
+
+By "controllable", we mean to evaluate whether VM-DPoSW consensus algorithm can be properly managed even with heavy transaction requests from the main chain and side chain, and whether our algorithm can steer the resource efficiency over BFDChain eco-system from any initial value to the optimum state within a limited time window. This kind of controllability property is a crucial to achieve queue stabilization, delay bounds, and optimal resource control. Assume
+
+通过"可控性"，我们可以评估VM-DPoSW一致性算法是否可以正确管理，即使有来自主链和侧链的频繁交易请求，以及我们的算法是否可以从任何初始值引导BFDChain生态系统的资源效率在有限的时间窗内达到最佳状态。这种可控性属性对于实现队列稳定，延迟界限和最佳资源控制至关重要. 假设
+
+$$ f(K, S(n)) = Hash\left(K + \sum_{i=1}^kS^{VM_i}(n)\right) \tag {11}$$
+$$ g(S(n),M) = S(n) mod (M) \tag {12} $$
+Eq.(9) and (10) yields. 
+$$ S(n+1) = f(K, S(n)) \tag {13} $$
+$$ O(n+1) = g(S(n), M) \tag {14} $$. 
+Eq. (13) and (14) describe a non-linear discrete system, where the state vector $x(n) = [s(n),o(n)]^T$ represent the array of signature hash value and the ordering of the VM delegate. The input vector $u(n) = [K,M]^T$ represent the array of the key value and the number of VM delegates. The linearization is necessary to analyze the controllability [5]. Assume the equilibrium point is $\left( s(n)_0, o(n)_0, K_0, M_0 \right)$ , all of which are positive real numbers; linearizing Eqs. (13), (14) the equilibrium point, we obtain the following linearized system in state space:  
+(13）和（14）描述了非线性离散系统，其中状态向量$x(n) = [s(n),o(n)]^T$表示签名散列值的数组和VM委托的排序。输入向量$u(n) = [K,M]^T$表示键值的数组和VM代表的数量。线性化是分析可控性的必要条件[5]。假设平衡点是$\left( s(n)_0, o(n)_0, K_0, M_0 \right)$，所有这些都是正实数;线性化方程。(13),(14)平衡点，我们在状态空间中得到以下线性化系统：  
+$$ \left( \begin{matrix} \delta \dot{S}(n+1) \\  \delta \dot{O}(n+1) \end{matrix} \right) =  \left( \right)\left( \right) + \left( \right)\left( \right)$$
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
